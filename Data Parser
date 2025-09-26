@@ -1,0 +1,69 @@
+module top_module(
+    input clk,
+    input [7:0] in,
+    input reset,    // Synchronous reset
+    output [23:0] out_bytes,
+    output done); //
+
+    // FSM from fsm_ps2
+	  parameter B1 =0, B2 =1, B3=2, DONE=3;
+    reg[2:0] state;
+    reg[2:0] next_state;
+     reg [7:0] byte1, byte2, byte3;
+    // cycle through the messages until bit[3]=1, this becomes byte1, wait for 20 something bits after
+
+    // State transition logic (combinational)
+    always@(*) begin
+        case(state) 
+            B1: if(in[3]) begin
+                next_state = B2;
+            end
+            else begin
+                next_state =B1;
+            end
+            B2: next_state = B3;
+            B3: next_state = DONE;
+            DONE: if(in[3]) begin
+                next_state = B2;
+            end
+            else begin
+                next_state = B1;
+            end
+            default: next_state = state;
+        endcase
+    end
+	
+    // State flip-flops (sequential)
+        always @(posedge clk) begin
+            if(reset) begin
+                state <= B1;
+            end
+            else begin
+                state <= next_state;
+                
+            end
+        end
+            
+ 
+    // Output logic
+            assign done = (state == DONE);
+    // New: Datapath to store incoming bytes.
+   // Byte capture logic (datapath)
+    always @(posedge clk) begin
+        if (reset) begin
+            byte1 <= 0;
+            byte2 <= 0;
+            byte3 <= 0;
+            out_bytes <= 24'b0;
+        end else begin
+            case (next_state)
+                B2: byte1 <= in;             // capture first byte (bit[3]=1)
+                B3: byte2 <= in;             // second byte
+                DONE: begin
+                    byte3 <= in;             // third byte
+                    out_bytes <= {byte1, byte2, in};  // output full 24-bit message
+                end
+            endcase
+        end
+    end
+endmodule
